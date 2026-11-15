@@ -1,0 +1,13 @@
+{
+  "name": "design-extractor",
+  "private": true,
+  "type": "module",
+  "description": "Extrai o design system de qualquer site renderizado (tokens, tipografia, componentes, estados, movimento, capturas). Veja PROMPT.md.",
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "extrair": "node extrair.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

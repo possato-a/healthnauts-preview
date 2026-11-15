@@ -122,6 +122,7 @@ The visual layer was redesigned as a small, central design system: **change a va
 - All colors, alert-level colors and the type scale live in [`src/design/tokens.ts`](src/design/tokens.ts). They become CSS variables at startup, which Tailwind, the global CSS, the charts and the 3D body all read.
 - Every screen is a `<Pagina>` (header + blocks, always 20 px apart) built from the pieces in `src/ui/` (`Painel`, `Numero`, `NumerosGrid`, charts) and `src/components/charts.tsx`.
 - The rules (what each color means, type scale, spacing, motion, what never to do) and recipes (new screen, new color, new chart) are in **[`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)**. Read it before changing anything visual.
+- To reproduce the look of **any other site**, use [`tools/design-extractor/`](tools/design-extractor/PROMPT.md): a Playwright script that measures a rendered site (tokens, type, components, hover states, motion, screenshots) plus a prompt that turns the data into a `DESIGN_SYSTEM.md`.
 - The science layer (`shared/`: alert levels, limits, calculations) was not touched by the redesign, and the interface never decides a level by itself.
 
 ## Run it locally
