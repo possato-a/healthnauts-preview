@@ -32,16 +32,16 @@ function AckStatus({ a, now }: { a: Alert; now: number }) {
   if (!a.requiresAcknowledgement) return null;
   const go = async () => { setBusy(true); try { await ack(a.id); } finally { setBusy(false); } };
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 text-[12px]">
       {a.acknowledgementStatus === 'acknowledged'
-        ? <span className="text-slate-300">Acknowledged at {fmtTime(a.acknowledgedAt)} · stays active until the condition returns to normal</span>
+        ? <span className="text-ink-2">Acknowledged at {fmtTime(a.acknowledgedAt)} · stays active until the condition returns to normal</span>
         : <>
-          <button onClick={go} disabled={busy} className="rounded-lg bg-white text-slate-950 font-semibold px-3 py-1.5 hover:bg-slate-200 disabled:opacity-60">Acknowledge</button>
+          <button onClick={go} disabled={busy} className="btn-primary !min-h-[30px] !h-[30px]">Acknowledge</button>
           {a.acknowledgementStatus === 'not_acknowledged'
-            ? <span className="text-orange-300">Not acknowledged in time · sent to the Crew Medical Officer and a second crew member</span>
-            : <span className="text-slate-300 font-mono">{countdown(a.acknowledgeBy, now)}</span>}
+            ? <span style={{ color: LEVEL_UI.warning.text }}>Not acknowledged in time · sent to the Crew Medical Officer and a second crew member</span>
+            : <span className="text-ink-2 font-mono">{countdown(a.acknowledgeBy, now)}</span>}
         </>}
-      {a.groundReportId && <span className="text-slate-400">· Ground report {a.groundReportId.slice(3, 11)}</span>}
+      {a.groundReportId && <span className="text-ink-3">· Ground report {a.groundReportId.slice(3, 11)}</span>}
     </div>
   );
 }
@@ -52,21 +52,22 @@ export function AlertBanner() {
   if (!active.length) return null;
   const sorted = [...active].sort((a, b) => severity(b.level) - severity(a.level));
   const needsAck = sorted.some((a) => a.requiresAcknowledgement);
+  // Uma linha por alerta, na largura da página: a cor só no fio da esquerda e na etiqueta; o texto inteiro fica na dica.
   return (
-    <div className="space-y-2 mb-5" role="alert">
+    <div className="mx-auto grid max-w-[1440px] grid-cols-[minmax(0,1fr)] gap-2 px-4 pt-3 sm:px-8 md:pt-4" role="alert">
       {sorted.map((a) => {
         const c = LEVEL_UI[a.level].color;
         return (
-          <div key={a.id} className="rounded-xl border p-3 flex flex-wrap items-start justify-between gap-3" style={{ borderColor: c + '88', background: c + '14' }}>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 text-xs"><StatusPill level={a.level} small /><span className="text-slate-400">{AREA_LABEL[a.areaId]} · {info(a.indicator).label} · since {fmtTime(a.shownAt)}</span></div>
-              <p className="text-sm text-slate-100 mt-1">{a.message}</p>
-            </div>
+          <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-white px-4 py-2.5 [box-shadow:var(--sombra-bloco)] [border:1px_solid_rgb(var(--border))]" style={{ borderLeft: `3px solid ${c}` }}>
+            <StatusPill level={a.level} small />
+            <span className="text-[13px] font-medium text-ink">{AREA_LABEL[a.areaId]} · {info(a.indicator).label}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] text-ink-3" title={a.message}>{a.message}</span>
+            <span className="whitespace-nowrap text-[12px] text-ink-3">since {fmtTime(a.shownAt)}</span>
             <AckStatus a={a} now={now} />
           </div>
         );
       })}
-      {needsAck && <p className="text-xs text-slate-400">{NO_ACK_TEXT} The device may be far away, switched off or offline.</p>}
+      {needsAck && <p className="text-[12px] text-ink-3">{NO_ACK_TEXT} The device may be far away, switched off or offline.</p>}
     </div>
   );
 }
@@ -106,24 +107,24 @@ export function EmergencyOverlay() {
         <motion.div className="fixed inset-0 z-[100] bg-red-950/95 grid place-items-center p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="alertdialog" aria-modal="true">
           <div className="max-w-2xl w-full text-center">
             <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ repeat: Infinity, duration: 1.2 }} className="mx-auto w-20 h-20 rounded-full bg-red-500 grid place-items-center"><Siren size={40} className="text-white" /></motion.div>
-            <p className="mt-5 text-sm font-semibold tracking-widest text-red-200">EMERGENCY</p>
+            <p className="mt-5 text-[13px] font-semibold tracking-widest text-red-200">EMERGENCY</p>
             <div className="mt-3 space-y-3">
               {open.map((a) => (
                 <div key={a.id}>
-                  <p className="text-xs text-red-200/80">{AREA_LABEL[a.areaId]} · {info(a.indicator).label}</p>
+                  <p className="text-[12px] text-red-200/80">{AREA_LABEL[a.areaId]} · {info(a.indicator).label}</p>
                   <p className="text-2xl md:text-3xl font-bold text-white leading-snug">{a.message}</p>
                 </div>
               ))}
             </div>
             <button onClick={go} disabled={busy} className="mt-8 w-full max-w-sm rounded-2xl bg-white text-red-700 text-lg font-bold py-4 hover:bg-red-50 disabled:opacity-60">Acknowledge</button>
-            <p className="mt-3 text-sm text-red-100 font-mono">
+            <p className="mt-3 text-[13px] text-red-100 font-mono">
               {open[0].acknowledgementStatus === 'not_acknowledged'
                 ? 'Not acknowledged in time · sent to the Crew Medical Officer and a second crew member'
                 : `Acknowledge within ${acknowledgement.deadlineMs.emergency / 60000} minutes · ${countdown(open[0].acknowledgeBy, now)}`}
             </p>
             <p className="mt-6 text-base font-semibold text-white">{NO_ACK_TEXT}</p>
-            <p className="text-sm text-red-100/80">The device may be far away, switched off or offline.</p>
-            {report && <p className="mt-4 text-xs text-red-100/80">Immediate ground report {report.transmission.status.toLowerCase()} · {report.transmission.message}</p>}
+            <p className="text-[13px] text-red-100/80">The device may be far away, switched off or offline.</p>
+            {report && <p className="mt-4 text-[12px] text-red-100/80">Immediate ground report {report.transmission.status.toLowerCase()} · {report.transmission.message}</p>}
           </div>
         </motion.div>
       )}

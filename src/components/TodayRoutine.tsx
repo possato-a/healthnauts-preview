@@ -1,32 +1,33 @@
-// Barra fina da rotina na Overview: "Next up: <tarefa> · <tempo>" + Start + progresso na cor da marca.
-// A lista completa (Ready / Done / Later) fica no painel do sino. x e y contam os mesmos itens dessa lista.
-import { CircleCheck, Clock, Play } from 'lucide-react';
+// A rotina do dia, num painel (o mesmo molde da lista de riscos). Cada linha: o que é, quanto leva e o estado.
+// A próxima a fazer tem o botão em destaque. O anel conta quantas já foram.
+import { Check } from 'lucide-react';
 import { routineProgress, useReminders } from './Notifications';
+import { cn } from '../lib/utils';
+import { Anel } from '../ui/graficos';
+import { Painel } from '../ui/pecas';
 
 export function RoutineBar() {
   const items = useReminders();
   const { done, total, next } = routineProgress(items);
-  const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <section aria-label="Today's routine" className="card !py-2.5 !px-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-      {next ? (
-        <>
-          <p className="text-sm text-slate-100 flex-1 min-w-[12rem] inline-flex flex-wrap items-center gap-x-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-brand-soft">Next up</span>
-            <span className="font-semibold">{next.title}</span>
-            {next.estimate && <span className="inline-flex items-center gap-1 text-slate-300"><Clock size={13} aria-hidden="true" />{next.estimate}</span>}
-          </p>
-          <button type="button" onClick={next.go} className="btn-primary tap !py-1.5"><Play size={14} aria-hidden="true" />Start<span className="sr-only">: {next.title}</span></button>
-        </>
-      ) : (
-        <p className="text-sm text-slate-300 flex-1 inline-flex items-center gap-2"><CircleCheck size={15} className="text-brand-soft" aria-hidden="true" />All done for today</p>
-      )}
-      <div className="flex items-center gap-2">
-        <div className="h-1.5 w-24 rounded-full bg-white/10 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="Routine done today">
-          <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
-        </div>
-        <span className="text-xs text-slate-300 whitespace-nowrap">{done} of {total} done today</span>
-      </div>
-    </section>
+    <Painel preenche titulo="Today's routine" legenda={<span role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="Routine done today"><Anel feito={done} total={total} tamanho={28}>{''}</Anel></span>}>
+      <ul className="-mx-5 -mb-5 -mt-2 grid auto-rows-fr divide-y-[.5px] divide-[rgb(var(--border))]">
+        {items.map(({ id, icon: Icon, title, sub, estimate, status, go }) => {
+          const isNext = next?.id === id;
+          return (
+            <li key={id} className="flex items-center gap-4 px-5 py-3">
+              <Icon size={16} strokeWidth={1.6} aria-hidden="true" className={status === 'done' ? 'text-ink-3' : 'text-ink'} />
+              <div className="min-w-0 flex-1">
+                <p className={cn('text-[14px]', status === 'done' ? 'text-ink-3 line-through decoration-[rgb(var(--border))]' : 'font-medium text-ink')}>{title}</p>
+                <p className="mt-0.5 truncate text-[12px] text-ink-3">{status === 'done' ? 'Done' : estimate ?? sub}</p>
+              </div>
+              {status === 'done' ? <Check size={16} className="text-good" aria-label="Done" />
+                : status === 'later' ? <span className="text-[12px] text-ink-3">Later</span>
+                : <button type="button" onClick={go} className={cn(isNext ? 'btn-primary' : 'btn-ghost', '!min-h-[32px] !px-4')}>Start<span className="sr-only">: {title}</span></button>}
+            </li>
+          );
+        })}
+      </ul>
+    </Painel>
   );
 }

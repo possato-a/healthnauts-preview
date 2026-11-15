@@ -19,8 +19,16 @@ export function useSim() {
   return s;
 }
 
+/** O botão da demonstração mora na barra do alto (Topo); o painel abre perto dele. */
+export function DemoButton() {
+  return (
+    <button onClick={() => window.dispatchEvent(new Event('hn:demo'))} className="btn-ghost"><FlaskConical size={14} />Demo</button>
+  );
+}
+
 export function DemoPanel() {
   const [open, setOpen] = useState(false);
+  useEffect(() => { const t = () => setOpen((o) => !o); window.addEventListener('hn:demo', t); return () => window.removeEventListener('hn:demo', t); }, []);
   const [busy, setBusy] = useState<string | null>(null);
   const [list, setList] = useState<{ id: string; areaId: string; label: string }[]>([]);
   const refresh = useStore((s) => s.refresh); const overview = useStore((s) => s.overview);
@@ -50,17 +58,14 @@ export function DemoPanel() {
 
   return (
     <>
-      <button onClick={() => setOpen(!open)} className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-brand hover:bg-brand-soft text-space-bg text-sm font-semibold px-4 py-2.5 shadow-lg">
-        <FlaskConical size={16} />Demo
-      </button>
       {open && (
-        <div className="fixed bottom-20 right-5 z-40 w-[22rem] max-w-[calc(100vw-2.5rem)] max-h-[70vh] overflow-y-auto rounded-2xl border border-space-line bg-space-deep shadow-2xl p-4">
-          <div className="flex items-center justify-between"><h3 className="card-title">Demo scenarios</h3><button onClick={() => setOpen(false)} aria-label="Close" className="text-slate-400 hover:text-white"><X size={18} /></button></div>
+        <div className="fixed top-14 right-6 z-40 w-[22rem] max-w-[calc(100vw-2.5rem)] max-h-[80vh] overflow-y-auto rounded-lg bg-white p-5 rise [box-shadow:var(--sombra-flutua)]">
+          <div className="flex items-center justify-between"><h3 className="card-title">Demo scenarios</h3><button onClick={() => setOpen(false)} aria-label="Close" className="text-ink-3 hover:text-ink"><X size={18} /></button></div>
           <p className="card-sub mt-1">Simulated data only. Each scenario is written through the onboard API.</p>
 
-          <div className="mt-3 rounded-xl border border-space-line p-3 flex items-center justify-between gap-3">
-            <div><p className="text-sm">Simulated live sensor</p><p className="text-xs text-slate-400">Cabin: {s.cabin} · Vitals: {s.vitals} · every 2 min</p></div>
-            <button onClick={() => (s.on ? sim.stop() : sim.start(refresh))} className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold ${s.on ? 'bg-brand/15 text-brand-soft border border-brand/50' : 'border border-space-line text-slate-300'}`}>
+          <div className="mt-3 rounded-xl bg-paper p-3.5 flex items-center justify-between gap-3">
+            <div><p className="text-[13px]">Simulated live sensor</p><p className="text-[12px] text-ink-3">Cabin: {s.cabin} · Vitals: {s.vitals} · every 2 min</p></div>
+            <button onClick={() => (s.on ? sim.stop() : sim.start(refresh))} className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium ${s.on ? 'bg-ink text-paper' : 'bg-white text-ink-2 [box-shadow:inset_0_0_0_1px_rgb(var(--border))]'}`}>
               <Power size={12} />{s.on ? 'On' : 'Off'}
             </button>
           </div>
@@ -68,24 +73,24 @@ export function DemoPanel() {
           <ul className="mt-3 space-y-1.5">
             {list.map((sc) => (
               <li key={sc.id}>
-                <button disabled={!!busy} onClick={() => scenario(sc.id)} className="w-full text-left rounded-lg border border-space-line hover:border-slate-500 px-3 py-2 disabled:opacity-50">
-                  <span className="block text-sm text-slate-100">{busy === sc.id ? 'Running…' : sc.label}</span>
-                  <span className="block text-xs text-slate-500">{AREA_LABEL[sc.areaId]}{sc.id === 'sensor-fault' ? ' · readings stop; Unavailable once the last one is older than 5 min' : ''}</span>
+                <button disabled={!!busy} onClick={() => scenario(sc.id)} className="w-full text-left rounded-xl hover:bg-paper px-3 py-2 transition-colors disabled:opacity-50 [box-shadow:inset_0_0_0_1px_rgb(var(--border))]">
+                  <span className="block text-[13px] text-ink">{busy === sc.id ? 'Running…' : sc.label}</span>
+                  <span className="block text-[12px] text-ink-3">{AREA_LABEL[sc.areaId]}{sc.id === 'sensor-fault' ? ' · readings stop; Unavailable once the last one is older than 5 min' : ''}</span>
                 </button>
               </li>
             ))}
             <li>
-              <button disabled={!!busy} onClick={() => run('exercise', () => sim.setMode({ vitals: 'exercise' }, refresh))} className="w-full text-left rounded-lg border border-space-line hover:border-slate-500 px-3 py-2 disabled:opacity-50">
-                <span className="block text-sm text-slate-100">Exercising (live sensor)</span><span className="block text-xs text-slate-500">Gravity · vital signs with activity = exercise</span>
+              <button disabled={!!busy} onClick={() => run('exercise', () => sim.setMode({ vitals: 'exercise' }, refresh))} className="w-full text-left rounded-xl hover:bg-paper px-3 py-2 transition-colors disabled:opacity-50 [box-shadow:inset_0_0_0_1px_rgb(var(--border))]">
+                <span className="block text-[13px] text-ink">Exercising (live sensor)</span><span className="block text-[12px] text-ink-3">Gravity · vital signs with activity = exercise</span>
               </button>
             </li>
           </ul>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <button disabled={!!busy} onClick={nominal} className="btn-ghost text-xs"><Undo2 size={13} />Back to nominal</button>
-            <button onClick={reset} className="btn-ghost text-xs"><RotateCcw size={13} />Reset demo</button>
+            <button disabled={!!busy} onClick={nominal} className="btn-ghost text-[12px]"><Undo2 size={13} />Back to nominal</button>
+            <button onClick={reset} className="btn-ghost text-[12px]"><RotateCcw size={13} />Reset demo</button>
           </div>
-          <p className="text-xs text-slate-500 mt-2">Back to nominal: the live sensor sends normal readings again and the Earth link returns. Alerts close only when a valid reading is back in range (the CO₂ 1-hour average takes up to an hour).</p>
+          <p className="text-[12px] text-ink-3 mt-2">Back to nominal: the live sensor sends normal readings again and the Earth link returns. Alerts close only when a valid reading is back in range (the CO₂ 1-hour average takes up to an hour).</p>
         </div>
       )}
     </>

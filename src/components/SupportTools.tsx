@@ -15,18 +15,18 @@ export function SupportTools() {
     { icon: Headphones, title: 'Music and mindfulness', sub: 'Focus and rest', tag: '15 min' },
   ];
   return (
-    <Card title="Support tools" sub="Self-care actions from NASA's isolation guidance (C-O-N-N-E-C-T)" icon={<Heart size={18} />}>
-      <ul className="space-y-2">
+    <Card title="Support tools" icon={<Heart size={15} />}>
+      <ul className="-my-2 divide-y-[.5px] divide-[rgb(var(--border))]">
         {tools.map(({ icon: Icon, title, sub, tag }) => (
-          <li key={title} className="w-full flex items-center gap-3 rounded-xl border border-space-line bg-space-deep/60 p-3">
-            <span className="w-9 h-9 rounded-lg bg-space-card grid place-items-center text-slate-300"><Icon size={16} /></span>
-            <span className="flex-1"><span className="block text-sm text-slate-100">{title}</span><span className="block text-xs text-slate-400">{sub}</span></span>
-            <span className="chip border-space-line text-slate-400 normal-case">{tag}</span>
-            <ChevronRight size={16} className="text-slate-500" />
+          <li key={title} className="flex w-full items-center gap-3 py-2">
+            <span className="grid size-8 place-items-center rounded-md bg-paper-2 text-ink-2"><Icon size={16} /></span>
+            <span className="flex-1"><span className="block text-[13px] font-medium text-ink">{title}</span><span className="block text-[12px] text-ink-3">{sub}</span></span>
+            <span className="chip normal-case">{tag}</span>
+            <ChevronRight size={16} className="text-ink-3" />
           </li>
         ))}
       </ul>
-      <p className="text-xs text-slate-500 mt-3">Flight surgeon reply time = 2 × one-way delay + about 15 min to review. Prototype: these tools are placeholders.</p>
+      <p className="text-[12px] text-ink-3">Prototype: these tools are placeholders. Flight surgeon reply = 2 × delay + about 15 min.</p>
       <SourcesList ids={['s33', 's15']} />
     </Card>
   );

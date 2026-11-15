@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Bell, Check, ClipboardCheck, Dumbbell, Scale, Timer, type LucideIcon } from 'lucide-react';
+import { LEVEL_UI, severity } from '../lib/levels';
+import { AREA_LABEL, AREA_PATH, info } from '../lib/content';
+import { StatusPill } from './ui';
 import { pvtCollection } from '../../shared/config/isolation.js';
 import { dayKey, useStore } from '../store/useStore';
 import { DAY_MS, startOfToday } from '../lib/format';
@@ -60,7 +63,7 @@ const STATUS_LABEL: Record<RoutineStatus, string> = { ready: 'Ready', done: 'Don
 export function StatusChip({ status }: { status: RoutineStatus }) {
   const reduced = useReducedMotion();
   if (status === 'done') return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-space-line px-2 py-0.5 text-xs text-slate-200 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-[12px] text-ink whitespace-nowrap">
       <motion.span className="grid place-items-center w-4 h-4 rounded-full bg-brand text-space-bg" aria-hidden="true"
         initial={reduced ? false : { scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} transition={{ duration: 0.3, ease: 'backOut' }}>
         <Check size={11} strokeWidth={3} />
@@ -68,38 +71,49 @@ export function StatusChip({ status }: { status: RoutineStatus }) {
     </span>
   );
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${status === 'ready' ? 'border-brand/60 text-brand-soft' : 'border-space-line text-slate-300'}`}>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] whitespace-nowrap ${status === 'ready' ? 'border-brand/60 text-brand-soft' : 'border-line text-ink-2'}`}>
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
+/** O sino é só de ALERTAS (Caution ou acima). A rotina do dia mora na tela Today. */
 export function Notifications() {
   const [open, setOpen] = useState(false);
-  const items = useReminders();
-  const pending = items.filter((r) => r.status === 'ready');
-  const { done, total } = routineProgress(items);
+  const nav = useNavigate();
+  const active = useStore((st) => st.alerts?.active ?? []);
+  const sorted = [...active].sort((a, b) => severity(b.level) - severity(a.level));
+  const top = sorted[0];
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} aria-expanded={open} className="relative w-10 h-10 rounded-xl border border-space-line grid place-items-center hover:border-slate-500" aria-label={`Today's routine: ${pending.length} ready`}>
-        <Bell size={18} />
-        {pending.length > 0 && <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-red-600 text-xs font-bold grid place-items-center text-white">{pending.length}</span>}
+      <button onClick={() => setOpen(!open)} aria-expanded={open} className="relative w-11 h-11 rounded-full bg-white grid place-items-center text-ink-2 hover:text-ink transition-colors [box-shadow:var(--shadow-card)]"
+        aria-label={`Alerts: ${active.length} active`}>
+        <Bell size={18} strokeWidth={1.75} />
+        {top && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold grid place-items-center text-white" style={{ background: LEVEL_UI[top.level].color }}>{active.length}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-space-line bg-space-deep shadow-xl p-2 z-50">
-          <p className="px-3 pt-2 pb-1 text-xs text-slate-300">Today's routine · {done} of {total} done today</p>
-          <ul>
-            {items.map(({ id, icon: Icon, title, sub, moment, status, go }) => (
-              <li key={id}>
-                <button onClick={() => { go(); setOpen(false); }} className="w-full flex items-center gap-3 rounded-lg p-3 hover:bg-space-card text-left">
-                  <span className="relative shrink-0"><Icon size={18} className="text-slate-300" aria-hidden="true" />{status === 'ready' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500" aria-hidden="true" />}</span>
-                  <span className="flex-1 min-w-0"><span className="block text-sm">{title}</span><span className="block text-xs text-slate-300">{moment} · {sub}</span></span>
-                  <StatusChip status={status} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <>
+          <button aria-label="Close" className="fixed inset-0 z-40 cursor-default !min-h-0 !min-w-0" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-3 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-2 z-50 rise" style={{ boxShadow: 'var(--shadow-float)' }}>
+            <p className="eyebrow px-3 pt-3 pb-2">Alerts</p>
+            {sorted.length === 0 ? (
+              <p className="px-3 pb-3 text-[14px] text-ink-2 inline-flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#2F9E6A]" />No active alerts</p>
+            ) : (
+              <ul>
+                {sorted.map((a) => (
+                  <li key={a.id}>
+                    <button onClick={() => { setOpen(false); nav(`${AREA_PATH[a.areaId as keyof typeof AREA_PATH] ?? '/'}?indicator=${encodeURIComponent(a.indicator)}`); }}
+                      className="w-full text-left rounded-xl p-3 hover:bg-paper transition-colors">
+                      <span className="flex items-center gap-2 text-[12px] text-ink-2"><StatusPill level={a.level} small />{AREA_LABEL[a.areaId]} · {info(a.indicator).label}</span>
+                      <span className="block text-[13px] text-ink mt-1.5 line-clamp-2">{a.message}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button onClick={() => { setOpen(false); nav('/profile#alerts'); }} className="w-full text-left px-3 py-3 mt-1 text-[13px] text-ink-2 hover:text-ink border-t transition-colors" style={{ borderColor: 'rgb(var(--border))' }}>See alert history →</button>
+          </div>
+        </>
       )}
     </div>
   );

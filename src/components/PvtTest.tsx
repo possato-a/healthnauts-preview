@@ -98,34 +98,34 @@ export function PvtTest() {
   return (
     <Modal open={open} onClose={close} title="Reaction check · PVT-B" sub="3 minutes · the reaction test NASA uses on the ISS" icon={<Timer size={18} />}>
       {e.phase === 'intro' && (
-        <div className="text-sm text-slate-300 space-y-3">
+        <div className="text-[13px] text-ink-2 space-y-3">
           <p>Tap the panel (or press Space) as soon as the counter starts. Don't tap before it appears.</p>
-          <p className="text-slate-400 text-xs">Responses of {pvtProtocol.lapseMs} ms or slower count as lapses. Taps before the counter count as false starts.</p>
-          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={demo} onChange={(ev) => setDemo(ev.target.checked)} className="accent-brand" />Demo mode: 30 seconds (saved as a demo run, not scored)</label>
+          <p className="text-ink-3 text-[12px]">Responses of {pvtProtocol.lapseMs} ms or slower count as lapses. Taps before the counter count as false starts.</p>
+          <label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={demo} onChange={(ev) => setDemo(ev.target.checked)} className="accent-brand" />Demo mode: 30 seconds (saved as a demo run, not scored)</label>
           <button onClick={() => e.begin(demo)} className="btn-primary w-full py-3">Start</button>
         </div>
       )}
       {e.running && (
-        <button onPointerDown={e.respond} className="w-full h-64 rounded-2xl border border-space-line bg-black grid place-items-center select-none">
-          {e.phase === 'stim' && <span className="font-mono text-6xl text-slate-100 tabular-nums">{e.counter}</span>}
-          {e.phase === 'feedback' && <span className="font-mono text-xl text-slate-300">{e.msg}</span>}
-          {e.phase === 'wait' && <span className="text-slate-600 text-sm">Wait for the counter…</span>}
+        <button onPointerDown={e.respond} className="w-full h-64 rounded-2xl border border-line bg-black grid place-items-center select-none">
+          {e.phase === 'stim' && <span className="font-mono text-6xl text-ink tabular-nums">{e.counter}</span>}
+          {e.phase === 'feedback' && <span className="font-mono text-xl text-ink-2">{e.msg}</span>}
+          {e.phase === 'wait' && <span className="text-slate-600 text-[13px]">Wait for the counter…</span>}
         </button>
       )}
       {e.phase === 'done' && (
         <div>
-          {!result && !error && <p className="text-sm text-slate-400">Saving…</p>}
-          {error && <p className="text-sm text-red-300">{error}</p>}
+          {!result && !error && <p className="text-[13px] text-ink-3">Saving…</p>}
+          {error && <p className="text-[13px] text-red-300">{error}</p>}
           {result && (
             <>
-              {result.status === 'interrupted' && <p className="text-sm text-slate-100 mb-3">Demo run, not scored. Only a full 3-minute test is compared with your usual range.</p>}
-              {result.status === 'no_valid_responses' && <p className="text-sm text-slate-100 mb-3">No valid responses were recorded.</p>}
+              {result.status === 'interrupted' && <p className="text-[13px] text-ink mb-3">Demo run, not scored. Only a full 3-minute test is compared with your usual range.</p>}
+              {result.status === 'no_valid_responses' && <p className="text-[13px] text-ink mb-3">No valid responses were recorded.</p>}
               <div className="grid grid-cols-3 gap-3 text-center">
                 <Stat label="Mean speed" value={c?.responseSpeed ? `${c.responseSpeed.toFixed(2)} /s` : '—'} sub={c?.responseSpeed ? `≈ ${Math.round(1000 / c.responseSpeed)} ms` : undefined} />
                 <Stat label="Lapses" value={c?.lapses ?? '—'} />
                 <Stat label="False starts" value={c?.falseStarts ?? '—'} />
               </div>
-              <p className="text-xs text-slate-400 mt-3">{c?.validResponses ?? 0} valid responses. Calculated by the onboard service; open Alertness to see how it compares with your usual range.</p>
+              <p className="text-[12px] text-ink-3 mt-3">{c?.validResponses ?? 0} valid responses. Calculated by the onboard service; open Alertness to see how it compares with your usual range.</p>
             </>
           )}
           <button onClick={close} className="mt-4 w-full bg-brand hover:bg-brand-soft text-space-bg font-semibold rounded-xl py-3">{result?.status === 'completed' ? `Done (+${XP_PER_PVT} XP)` : 'Close'}</button>

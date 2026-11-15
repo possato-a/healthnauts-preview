@@ -1,5 +1,5 @@
-// NumberTicker do Magic UI (magicui.design/r/number-ticker), adaptado: framer-motion no lugar de motion/react,
-// Geist Mono, valor final para leitores de tela e sem animação com prefers-reduced-motion.
+// Número que conta até o valor (framer-motion), com o valor final para leitores de tela e sem animação com
+// prefers-reduced-motion. Algarismos de largura igual, na fonte do texto (não mono).
 import { useEffect, useRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { useInView, useMotionValue, useReducedMotion, useSpring } from 'framer-motion';
 import { cn } from '../../lib/utils';
@@ -19,7 +19,7 @@ export function NumberTicker({ value, startValue = 0, direction = 'up', delay = 
   const reduced = !!useReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
   const motionValue = useMotionValue(direction === 'down' ? value : startValue);
-  const springValue = useSpring(motionValue, { damping: 60, stiffness: 100 });
+  const springValue = useSpring(motionValue, { damping: 40, stiffness: 90 });
   const isInView = useInView(ref, { once: true, margin: '0px' });
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function NumberTicker({ value, startValue = 0, direction = 'up', delay = 
 
   const final = format(direction === 'down' ? startValue : value, decimalPlaces);
   return (
-    <span className={cn('relative inline-block font-mono tabular-nums', className)} {...props}>
+    <span className={cn('relative inline-block num', className)} {...props}>
       <span className="sr-only">{final}</span>
       <span ref={ref} aria-hidden="true">{reduced ? final : format(direction === 'down' ? value : startValue, decimalPlaces)}</span>
     </span>
@@ -43,17 +43,19 @@ export function NumberTicker({ value, startValue = 0, direction = 'up', delay = 
 }
 
 /**
- * Valor de cartão: conta até o número inicial do texto ("7.2 h", "2 of 4", "118") e mantém o resto igual.
- * Texto sem número no começo ("No link", "—") ou nó React aparece como veio.
+ * Valor de cartão: conta até o número inicial do texto ("7.2 h", "2 of 4", "118") e mantém o resto igual, menor e em cinza
+ * quando é a unidade ("62 bpm" → 62 grande, bpm pequeno). Texto sem número no começo aparece como veio.
  */
 export function TickerValue({ value }: { value: ReactNode }) {
   if (typeof value !== 'string' && typeof value !== 'number') return <>{value}</>;
   const m = String(value).match(/^(-?\d+(?:\.(\d+))?)(.*)$/s);
   if (!m) return <span>{value}</span>;
+  const rest = m[3];
+  const unit = /^\s+[^\d\s]/.test(rest) && rest.trim().length <= 10;
   return (
-    <span className="font-mono tabular-nums">
+    <span className="num">
       <NumberTicker value={Number(m[1])} decimalPlaces={m[2]?.length ?? 0} />
-      {m[3]}
+      {unit ? <span className="text-[0.48em] text-ink-2 ml-1 tracking-normal font-sans font-normal">{rest.trim()}</span> : rest}
     </span>
   );
 }

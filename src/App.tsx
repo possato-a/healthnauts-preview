@@ -1,14 +1,14 @@
 // Rotas do app. O sensor simulado começa ligado quando o site abre (ajuste aprovado nº 4).
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useStore } from './store/useStore';
 import { sim } from './sim/liveSensors';
 import { AppShell } from './components/AppShell';
+import { Splash } from './components/Splash';
 import Overview from './pages/Overview';
 import Isolation from './pages/Isolation';
 import Environment from './pages/Environment';
-import GroundControl from './pages/GroundControl';
 import Radiation from './pages/Radiation';
 import Gravity from './pages/Gravity';
 import Distance from './pages/Distance';
@@ -40,17 +40,25 @@ export default function App() {
     return () => { cancelled = true; clearInterval(timer); sim.stop(); };
   }, []);
 
-  if (error) return <div className="p-8 text-red-300">{error}</div>;
-  if (!ready) return <div className="min-h-screen grid place-items-center text-slate-400 text-sm">Starting the onboard data service…</div>;
+  // A tela de carregamento fica pelo menos 2,8 s (a animação respira) e some quando os dados chegam.
+  const [minimo, setMinimo] = useState(false);
+  const [fim, setFim] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMinimo(true), 2800); return () => clearTimeout(t); }, []);
+  useEffect(() => { document.getElementById('boot')?.remove(); }, []);
+  const acabou = useCallback(() => setFim(true), []);
+
+  if (error) return <div className="p-8 text-bad">{error}</div>;
   return (
-    <HashRouter>
+    <>
+    {!fim && <Splash saindo={ready && minimo} onFim={acabou} />}
+    {ready && <HashRouter>
       <AppShell>
         <PageTransition>
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/isolation" element={<Isolation />} />
           <Route path="/environment" element={<Environment />} />
-          <Route path="/ground" element={<GroundControl />} />
+          <Route path="/ground" element={<Navigate to="/distance?tab=reports" replace />} />
           <Route path="/radiation" element={<Radiation />} />
           <Route path="/gravity" element={<Gravity />} />
           <Route path="/distance" element={<Distance />} />
@@ -59,6 +67,7 @@ export default function App() {
         </Routes>
         </PageTransition>
       </AppShell>
-    </HashRouter>
+    </HashRouter>}
+    </>
   );
 }

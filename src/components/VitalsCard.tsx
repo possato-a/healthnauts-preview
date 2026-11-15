@@ -7,6 +7,7 @@ import { useSim } from './DemoPanel';
 import { AREA } from '../config/api';
 import { ago } from '../lib/format';
 import { Card, StatusPill } from './ui';
+import { ComUnidade } from '../ui/pecas';
 
 export function VitalsCard({ detailed }: { detailed?: boolean }) {
   const vital = useStore((s) => s.overview?.vitalSigns);
@@ -24,22 +25,24 @@ export function VitalsCard({ detailed }: { detailed?: boolean }) {
   return (
     <div ref={ref} id="vital-signs" className="scroll-mt-48">
     <Card title="Vital signs" sub={`Simulated wrist sensor · ${s.lastVitals ? 'updated ' + ago(s.lastVitals.recordedAt) : 'waiting for a reading'}${s.lastVitals?.activity === 'exercise' ? ' · exercising' : ''}`}
-      icon={<HeartPulse size={18} />} right={vital && <StatusPill level={vital.displayLevel} />}>
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-        {items.map(([k, v]) => <div key={k} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3"><p className="text-xs text-slate-400">{k}</p><p className="text-lg font-medium font-mono tabular-nums mt-0.5">{v}</p></div>)}
+      icon={<HeartPulse size={15} />} right={vital && <StatusPill level={vital.displayLevel} />}>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-5">
+        {items.map(([k, v]) => (
+          <div key={k} className="grid gap-1.5"><p className="text-[12px] text-ink-3">{k}</p><p className="serif num text-[22px] leading-none"><ComUnidade valor={v} /></p></div>
+        ))}
       </div>
-      {vital?.message && <p className="text-sm text-slate-200 mt-3">{vital.message}</p>}
+      {vital?.message && <p className="text-[13px] text-ink-2">{vital.message}</p>}
       {news2 && (
-        <div className="mt-3 rounded-xl border border-space-line bg-space-deep/60 p-3">
-          <p className="text-xs text-slate-300 inline-flex items-center gap-1.5"><Activity size={13} />Early warning score (terrestrial reference, experimental): <b className="text-slate-100">{news2.score ?? '—'}</b></p>
+        <div className="grid gap-2 rounded-md bg-paper-2 px-3.5 py-3">
+          <p className="inline-flex items-center gap-1.5 text-[13px] text-ink-2"><Activity size={13} />Early warning score (terrestrial reference, experimental): <b className="num text-ink">{news2.score ?? '—'}</b></p>
           {detailed && news2.components && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
+            <div className="flex flex-wrap gap-1.5">
               {Object.entries(news2.components as Record<string, number>).map(([k, pts]) => (
-                <span key={k} className="chip normal-case border-space-line text-slate-300">{k.replace(/_/g, ' ')}: {pts}</span>
+                <span key={k} className="chip bg-white normal-case">{k.replace(/_/g, ' ')}: {pts}</span>
               ))}
             </div>
           )}
-          <p className="text-xs text-slate-500 mt-1.5">{news2.limitation}</p>
+          <p className="text-[12px] text-ink-3">{news2.limitation}</p>
         </div>
       )}
     </Card>

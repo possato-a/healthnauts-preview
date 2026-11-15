@@ -7,7 +7,8 @@ import { useStore } from '../store/useStore';
 import { DAY_MS, mean, startOfToday } from '../lib/format';
 import { info } from '../lib/content';
 import { isFlagged } from '../lib/levels';
-import type { AlsoItem } from '../components/lean/Home';
+
+export interface AlsoItem { label: string; level: DisplayLevel; message: string }
 
 export function useArea(areaId: AreaId) {
   const loadArea = useStore((s) => s.loadArea);
@@ -37,6 +38,14 @@ export function useArea(areaId: AreaId) {
     /** Outras avaliações com nível, além da manchete, para o resumo do dia. */
     const also = (exclude?: string | null): AlsoItem[] => assessments.filter((x) => isFlagged(x.displayLevel) && x.indicator !== exclude)
       .map((x) => ({ label: info(x.indicator).label, level: x.displayLevel, message: x.message }));
-    return { detail, summary, assessments, a, newest, latest, avg7, worst, also, week, ready: !!detail && !!summary };
+    /** Os valores dos últimos 7 dias de um indicador, para a linhazinha do número. */
+    const serie = (indicator: string, map: (v: number) => number = (v) => v) =>
+      week.filter((r) => r.indicator === indicator).map((r) => map(Number(r.value))).filter((v) => Number.isFinite(v));
+    /** As linhas de aviso do alto da tela: a manchete da área e os outros itens com nível. */
+    const avisos = () => !summary ? [] : [
+      { label: info(summary.headline.indicator ?? '').label, level: summary.displayLevel, message: summary.headline.message ?? '' },
+      ...also(summary.headline.indicator).map((x) => ({ label: x.label, level: x.level, message: x.message })),
+    ];
+    return { detail, summary, assessments, a, newest, latest, avg7, serie, avisos, worst, also, week, ready: !!detail && !!summary };
   }, [detail, summary, week]);
 }

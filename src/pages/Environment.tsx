@@ -1,23 +1,24 @@
 // Environment (cabine): ar, pressão, O2, conforto, ruído e checklist pós-EVA. Níveis e mensagens vêm da API.
 import { useState } from 'react';
-import { Gauge, Thermometer, Volume2, Wind, Activity, ClipboardList } from 'lucide-react';
 import { gas, rules } from '../../shared/config/research.js';
 import { AREA } from '../config/api';
 import { api } from '../services/api';
 import { useStore } from '../store/useStore';
 import { useArea } from './useArea';
-import { KeyTiles, TodayHero, TopicLinks } from '../components/lean/Home';
-import { CompareRow, TopicDetail, compareItem, useTopicState, type TopicDef } from '../components/lean/TopicDetail';
+import { Pagina } from '../ui/Pagina';
+import { Avisos, Numero, NumerosGrid, Painel } from '../ui/pecas';
+import { Margens, Medidor } from '../ui/graficos';
+import { CompareRow, Trends, compareItem, useTrends, type TopicDef } from '../components/lean/TopicDetail';
 import { TrendChart, type RefLine } from '../components/charts';
-import { Card, Section, StatusPill } from '../components/ui';
+import { More, Section, StatusPill, WhyBlock } from '../components/ui';
 import { LEVEL_UI } from '../lib/levels';
-import { EVA_SYMPTOMS, info } from '../lib/content';
+import { color } from '../design/tokens';
+import { EVA_SYMPTOMS } from '../lib/content';
 import { ago, fmtDateTime } from '../lib/format';
 
 const TOPICS: TopicDef[] = [
   { id: 'air', label: 'Air', indicators: ['co2_partial_pressure', 'co2_partial_pressure_7d', 'cabin_pressure', 'inspired_oxygen_pressure'], also: ['co2_concentration', 'oxygen_fraction', 'oxygen_partial_pressure'] },
   { id: 'comfort', label: 'Comfort & noise', indicators: ['temperature_humidity', 'cabin_noise'], also: ['temperature', 'relative_humidity'] },
-  { id: 'eva', label: 'After EVA', indicators: ['post_eva_symptoms'], also: ['reported_symptoms'] },
 ];
 const PSIA = gas.mmHgPerUnit.psia as number;
 const COMFORT = rules.climate.comfort as { temperature: number[]; humidity: number[] };
@@ -33,7 +34,7 @@ const PRESSURE_REFS: RefLine[] = [
   { y: rules.pressure.maximumPsia, label: `${rules.pressure.maximumPsia} psia`, color: LEVEL_UI.emergency.color },
 ];
 const NOISE_REFS: RefLine[] = [
-  { y: rules.noise.sleep, label: `${rules.noise.sleep} dBA (sleep)`, color: '#94A3B8' },
+  { y: rules.noise.sleep, label: `${rules.noise.sleep} dBA (sleep)`, color: color.mark },
   { y: rules.noise.work, label: `${rules.noise.work} dBA (work)`, color: LEVEL_UI.advisory.color },
   { y: rules.noise.ceiling, label: `${rules.noise.ceiling} dBA`, color: LEVEL_UI.caution.color },
 ];
@@ -48,18 +49,18 @@ function PostEvaForm() {
     finally { setBusy(false); }
   };
   return (
-    <div>
-      <label className="text-xs text-slate-400 inline-flex items-center gap-2">EVA ended
+    <div className="grid gap-4">
+      <label className="inline-flex items-center gap-2 text-[12px] text-ink-3">EVA ended
         <input type="number" min={0} max={1440} value={ended} onChange={(e) => setEnded(Math.max(0, +e.target.value))} className="field !w-20 !py-1" /> min ago</label>
-      <div className="grid sm:grid-cols-2 gap-1.5 mt-3">
+      <div className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
         {EVA_SYMPTOMS.map(([id, label]) => (
-          <label key={id} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer ${picked.includes(id) ? 'border-brand bg-brand/10' : 'border-space-line'}`}>
+          <label key={id} className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-2">
             <input type="checkbox" checked={picked.includes(id)} onChange={() => toggle(id)} className="accent-brand" />{label}
           </label>
         ))}
       </div>
-      <button onClick={send} disabled={busy} className="btn-primary mt-3">{picked.length ? `Report ${picked.length} symptom${picked.length > 1 ? 's' : ''}` : 'No symptoms'}</button>
-      <p className="text-xs text-slate-500 mt-2">Most decompression sickness cases appear 60 to 240 minutes after decompression. Check again every hour.</p>
+      <button onClick={send} disabled={busy} className="btn-primary w-fit">{picked.length ? `Report ${picked.length} symptom${picked.length > 1 ? 's' : ''}` : 'No symptoms'}</button>
+      <p className="text-[12px] text-ink-3">Check again every hour: most cases appear 60 to 240 minutes after decompression.</p>
     </div>
   );
 }
@@ -67,61 +68,72 @@ function PostEvaForm() {
 export default function Environment() {
   const d = useArea(AREA.cabin);
   const grav = useStore((s) => s.details[AREA.gravity]);
-  const [topic, setTopic] = useTopicState(TOPICS);
-  if (!d.ready) return <p className="text-sm text-slate-400">Loading…</p>;
+  const { ctx, filtro } = useTrends(AREA.cabin, d.assessments);
+  if (!d.ready) return <p className="p-8 text-[13px] text-ink-3">Loading…</p>;
   const lv = (id: string) => d.a(id)?.displayLevel ?? 'unavailable';
   const co2 = d.a('co2_partial_pressure'); const p = d.a('cabin_pressure'); const o2 = d.a('inspired_oxygen_pressure');
   const th = d.a('temperature_humidity'); const noise = d.a('cabin_noise');
   const headache = grav?.latestRecords.find((r) => r.indicator === 'headache');
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-sm text-slate-400">Hostile closed environment · Cabin air, pressure, comfort and noise</h1>
-      <TodayHero level={d.summary!.displayLevel} label="Cabin now" message={d.summary!.headline.message ?? ''} sub={`last reading ${ago(d.latest('cabin_pressure')?.recordedAt ?? d.summary!.lastRecordedAt)}`} also={d.also(d.summary!.headline.indicator)} />
-      <KeyTiles cols={5} tiles={[
-        { key: 'co2', title: 'CO₂ · 1 h avg', icon: Wind, value: <>{n(co2?.value, 2)}<span className="text-base text-slate-400"> mmHg</span></>, level: lv('co2_partial_pressure'), compare: `Limit ${rules.co2.limit} mmHg (NASA)`, onClick: () => setTopic('air') },
-        { key: 'p', title: 'Cabin pressure', icon: Gauge, value: <>{n(p?.psia ?? (typeof p?.value === 'number' ? toPsia(p.value) : undefined), 1)}<span className="text-base text-slate-400"> psia</span></>, level: lv('cabin_pressure'), compare: `Safe ${rules.pressure.minimumPsia}-${rules.pressure.maximumPsia} psia (ISS 14.7)`, onClick: () => setTopic('air') },
-        { key: 'o2', title: 'Inspired O₂', icon: Activity, value: <>{n(o2?.value, 0)}<span className="text-base text-slate-400"> mmHg</span></>, level: lv('inspired_oxygen_pressure'), compare: `Target ${rules.oxygen.normal[0]}-${rules.oxygen.normal[1]} mmHg`, onClick: () => setTopic('air') },
-        { key: 'th', title: 'Temp · humidity', icon: Thermometer, value: th?.value ? <>{n(th.value.temperature, 1)}°<span className="text-base text-slate-400"> · {n(th.value.humidity, 0)}%</span></> : '—', level: lv('temperature_humidity'), compare: `Comfort ${COMFORT.temperature.join('-')} °C, ${COMFORT.humidity.join('-')}% RH`, onClick: () => setTopic('comfort') },
-        { key: 'noise', title: 'Noise', icon: Volume2, value: <>{n(noise?.value, 0)}<span className="text-base text-slate-400"> dBA</span></>, level: lv('cabin_noise'), compare: `Work ≤ ${rules.noise.work} dBA · never ${rules.noise.ceiling}`, onClick: () => setTopic('comfort') },
-      ]} />
-      <TopicLinks topics={TOPICS.map((t) => ({ id: t.id, label: t.label, level: d.worst(t.indicators) }))} onOpen={setTopic} />
-      <Card title="Post-EVA symptom check" sub="Decompression sickness checklist · shown after each EVA" icon={<ClipboardList size={18} />} right={<StatusPill level={lv('post_eva_symptoms')} />}>
-        <p className="text-sm text-slate-300 mb-3">{d.a('post_eva_symptoms')?.message}</p>
-        <PostEvaForm />
-      </Card>
-      <p className="text-xs text-slate-500">Limits marked NASA come from NASA-STD-3001 Vol. 2 Rev. F (July 2026). The temperature/humidity box and noise in dBA are prototype simplifications.</p>
+    <Pagina contexto="Hostile and closed environment"
+      titulo="Cabin" sub="The air you breathe, the pressure, the comfort and the noise." direita={filtro}>
+      <Avisos itens={d.avisos()} />
 
-      <TopicDetail areaId={AREA.cabin} topics={TOPICS} topic={topic} onTopic={setTopic} assessments={d.assessments}>
-        {(t, ctx) => (<>
+      <NumerosGrid n={5} cols={5}>
+        <Numero nome="CO₂ · 1 h avg" valor={`${n(co2?.value, 2)} mmHg`} serie={d.serie('co2_partial_pressure')} nivel={lv('co2_partial_pressure')} definicao={`NASA limit: ${rules.co2.limit} mmHg (1 h average)`} to="?indicator=co2_partial_pressure" />
+        <Numero nome="Cabin pressure" valor={`${n(p?.psia ?? (typeof p?.value === 'number' ? toPsia(p.value) : undefined), 1)} psia`} serie={d.serie('cabin_pressure', toPsia)} nivel={lv('cabin_pressure')} comparacao={`Safe ${rules.pressure.minimumPsia}-${rules.pressure.maximumPsia} psia`} to="?indicator=cabin_pressure" />
+        <Numero nome="Inspired O₂" valor={`${n(o2?.value, 0)} mmHg`} serie={d.serie('inspired_oxygen_pressure')} nivel={lv('inspired_oxygen_pressure')} comparacao={`Target ${rules.oxygen.normal[0]}-${rules.oxygen.normal[1]} mmHg`} to="?indicator=inspired_oxygen_pressure" />
+        <Numero nome="Temp · humidity" valor={th?.value ? `${n(th.value.temperature, 1)}° · ${n(th.value.humidity, 0)}%` : '—'} serie={d.serie('temperature')} nivel={lv('temperature_humidity')} comparacao={`Comfort ${COMFORT.temperature.join('-')} °C`} to="?indicator=temperature" />
+        <Numero nome="Noise" valor={`${n(noise?.value, 0)} dBA`} serie={d.serie('cabin_noise')} nivel={lv('cabin_noise')} definicao={`Work ≤ ${rules.noise.work} dBA, never above ${rules.noise.ceiling}`} to="?indicator=cabin_noise" />
+      </NumerosGrid>
+
+      <div className="grid grid-cols-[minmax(0,1fr)] items-stretch gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <Painel preenche indicator="post_eva_symptoms reported_symptoms" titulo="Post-EVA symptom check" legenda={<StatusPill level={lv('post_eva_symptoms')} small />}>
+        {d.a('post_eva_symptoms')?.message && <p className="text-[13px] text-ink-2">{d.a('post_eva_symptoms')?.message}</p>}
+        <PostEvaForm />
+      </Painel>
+      <Painel preenche titulo="Limits" legenda={<span className="text-[12px] text-ink-3">Tick = limit</span>}>
+        {typeof co2?.value === 'number' && <Medidor valor={co2.value} texto={co2.value.toFixed(2)} unidade="mmHg" max={rules.co2.limit * 1.25} limite={rules.co2.limit} nivel={lv('co2_partial_pressure')} nota={`CO₂, 1 h average · NASA limit ${rules.co2.limit} mmHg`} />}
+        <Margens itens={[
+          { nome: 'Cabin pressure', valor: typeof p?.value === 'number' ? `${toPsia(p.value).toFixed(1)} of ${rules.pressure.maximumPsia} psia max` : '—', fracao: typeof p?.value === 'number' ? toPsia(p.value) / (rules.pressure.maximumPsia * 1.1) : 0, limite: 1 / 1.1, nivel: lv('cabin_pressure') },
+          { nome: 'Noise', valor: typeof noise?.value === 'number' ? `${Math.round(noise.value)} of ${rules.noise.ceiling} dBA` : '—', fracao: typeof noise?.value === 'number' ? noise.value / (rules.noise.ceiling * 1.2) : 0, limite: 1 / 1.2, nivel: lv('cabin_noise') },
+        ]} />
+      </Painel>
+      </div>
+
+      <Trends ctx={ctx} topics={TOPICS}>
+        {(t, c) => (<>
           {t === 'air' && (<>
-            <CompareRow periodLabel={ctx.periodLabel} items={[
-              { ...compareItem(ctx, 'co2_partial_pressure', 'CO₂ reading', (x) => `${x.toFixed(2)} mmHg`), level: lv('co2_partial_pressure') },
-              { ...compareItem(ctx, 'cabin_pressure', 'Cabin pressure', (x) => `${x.toFixed(1)} psia`, 'number', toPsia), level: lv('cabin_pressure') },
-              { ...compareItem(ctx, 'inspired_oxygen_pressure', 'Inspired O₂', (x) => `${Math.round(x)} mmHg`), level: lv('inspired_oxygen_pressure') },
+            <CompareRow periodLabel={c.periodLabel} items={[
+              { ...compareItem(c, 'co2_partial_pressure', 'CO₂ reading', (x) => `${x.toFixed(2)} mmHg`), level: lv('co2_partial_pressure') },
+              { ...compareItem(c, 'cabin_pressure', 'Cabin pressure', (x) => `${x.toFixed(1)} psia`, 'number', toPsia), level: lv('cabin_pressure') },
+              { ...compareItem(c, 'inspired_oxygen_pressure', 'Inspired O₂', (x) => `${Math.round(x)} mmHg`), level: lv('inspired_oxygen_pressure') },
             ]} />
-            <Section indicator="co2_partial_pressure co2_partial_pressure_7d co2_concentration" title="CO₂ partial pressure (each reading)"><TrendChart records={ctx.series('co2_partial_pressure')} refs={CO2_REFS} unit="" fmt={(x) => `${x.toFixed(2)} mmHg`} lastLevel={lv('co2_partial_pressure')} /></Section>
-            <p className="text-xs text-slate-500">The level uses the time-weighted 1-hour average ({n(co2?.value, 2)} mmHg). 7-day average: {d.a('co2_partial_pressure_7d')?.message}</p>
-            <div className="mt-3 rounded-xl border border-space-line p-3 text-xs text-slate-300">
-              Reported headache (shown side by side, no cause is inferred): <b>{headache ? `${headache.value}/10 · ${fmtDateTime(headache.recordedAt)}` : 'none reported'}</b>
-            </div>
-            <Section indicator="cabin_pressure" title="Total cabin pressure"><TrendChart records={ctx.series('cabin_pressure').map((r) => ({ ...r, value: toPsia(Number(r.value)) }))} refs={PRESSURE_REFS} domain={[0, 16]} fmt={(x) => `${x.toFixed(2)} psia`} lastLevel={lv('cabin_pressure')} /></Section>
-            <Section indicator="inspired_oxygen_pressure oxygen_fraction oxygen_partial_pressure" title="Inspired oxygen (PIO₂)"><TrendChart records={ctx.series('inspired_oxygen_pressure')} refs={[{ y: rules.oxygen.normal[0], label: `${rules.oxygen.normal[0]} mmHg`, color: LEVEL_UI.caution.color }, { y: rules.oxygen.normal[1], label: `${rules.oxygen.normal[1]} mmHg`, color: LEVEL_UI.caution.color }]} fmt={(x) => `${Math.round(x)} mmHg`} lastLevel={lv('inspired_oxygen_pressure')} /></Section>
+            <Section indicator="co2_partial_pressure co2_partial_pressure_7d co2_concentration" title="CO₂ partial pressure (each reading)" right={<span className="text-[12px] text-ink-3">Headache: <b className="font-medium text-ink-2">{headache ? `${headache.value}/10 · ${fmtDateTime(headache.recordedAt)}` : 'none reported'}</b></span>}>
+              <TrendChart records={c.series('co2_partial_pressure')} refs={CO2_REFS} unit="" fmt={(x) => `${x.toFixed(2)} mmHg`} lastLevel={lv('co2_partial_pressure')} />
+            </Section>
+            <Section indicator="cabin_pressure" title="Total cabin pressure"><TrendChart records={c.series('cabin_pressure').map((r) => ({ ...r, value: toPsia(Number(r.value)) }))} refs={PRESSURE_REFS} domain={[0, 16]} fmt={(x) => `${x.toFixed(2)} psia`} lastLevel={lv('cabin_pressure')} /></Section>
+            <Section indicator="inspired_oxygen_pressure oxygen_fraction oxygen_partial_pressure" title="Inspired oxygen (PIO₂)"><TrendChart records={c.series('inspired_oxygen_pressure')} refs={[{ y: rules.oxygen.normal[0], label: `${rules.oxygen.normal[0]} mmHg`, color: LEVEL_UI.caution.color }, { y: rules.oxygen.normal[1], label: `${rules.oxygen.normal[1]} mmHg`, color: LEVEL_UI.caution.color }]} fmt={(x) => `${Math.round(x)} mmHg`} lastLevel={lv('inspired_oxygen_pressure')} /></Section>
           </>)}
           {t === 'comfort' && (<>
-            <CompareRow periodLabel={ctx.periodLabel} items={[
-              { ...compareItem(ctx, 'temperature', 'Temperature', (x) => `${x.toFixed(1)} °C`), level: lv('temperature_humidity') },
-              { ...compareItem(ctx, 'relative_humidity', 'Humidity', (x) => `${Math.round(x)}%`), level: lv('temperature_humidity') },
-              { ...compareItem(ctx, 'cabin_noise', 'Noise', (x) => `${Math.round(x)} dBA`), level: lv('cabin_noise') },
+            <CompareRow periodLabel={c.periodLabel} items={[
+              { ...compareItem(c, 'temperature', 'Temperature', (x) => `${x.toFixed(1)} °C`), level: lv('temperature_humidity') },
+              { ...compareItem(c, 'relative_humidity', 'Humidity', (x) => `${Math.round(x)}%`), level: lv('temperature_humidity') },
+              { ...compareItem(c, 'cabin_noise', 'Noise', (x) => `${Math.round(x)} dBA`), level: lv('cabin_noise') },
             ]} />
-            <Section indicator="temperature temperature_humidity" title="Temperature"><TrendChart records={ctx.series('temperature')} refs={COMFORT.temperature.map((y: number) => ({ y, label: `${y} °C`, color: '#94A3B8' }))} fmt={(x) => `${x} °C`} lastLevel={lv('temperature_humidity')} /></Section>
-            <Section indicator="relative_humidity" title="Relative humidity"><TrendChart records={ctx.series('relative_humidity')} refs={COMFORT.humidity.map((y: number) => ({ y, label: `${y}%`, color: '#94A3B8' }))} fmt={(x) => `${x}%`} lastLevel={lv('temperature_humidity')} /></Section>
-            <Section indicator="cabin_noise" title="Noise"><TrendChart records={ctx.series('cabin_noise')} refs={NOISE_REFS} fmt={(x) => `${x} dBA`} lastLevel={lv('cabin_noise')} /></Section>
+            <Section indicator="temperature temperature_humidity" title="Temperature"><TrendChart records={c.series('temperature')} refs={COMFORT.temperature.map((y: number) => ({ y, label: `${y} °C`, color: color.mark }))} fmt={(x) => `${x} °C`} lastLevel={lv('temperature_humidity')} /></Section>
+            <Section indicator="relative_humidity" title="Relative humidity"><TrendChart records={c.series('relative_humidity')} refs={COMFORT.humidity.map((y: number) => ({ y, label: `${y}%`, color: color.mark }))} fmt={(x) => `${x}%`} lastLevel={lv('temperature_humidity')} /></Section>
+            <Section indicator="cabin_noise" title="Noise"><TrendChart records={c.series('cabin_noise')} refs={NOISE_REFS} fmt={(x) => `${x} dBA`} lastLevel={lv('cabin_noise')} /></Section>
           </>)}
-          {t === 'eva' && <Section indicator="post_eva_symptoms reported_symptoms" title="Post-EVA checklist"><PostEvaForm /></Section>}
-          <p className="text-xs text-slate-500 mt-4">{info(t === 'air' ? 'co2_partial_pressure' : t === 'comfort' ? 'cabin_noise' : 'post_eva_symptoms').why}</p>
         </>)}
-      </TopicDetail>
-    </div>
+      </Trends>
+
+      <More title="Why measure this? · Sources">
+        <WhyBlock ids={['co2_partial_pressure', 'cabin_pressure', 'cabin_noise']} />
+        <p className="mt-4 text-[12px] text-ink-3">The CO₂ level uses the time-weighted 1-hour average ({n(co2?.value, 2)} mmHg). 7-day average: {d.a('co2_partial_pressure_7d')?.message}</p>
+        <p className="mt-1.5 text-[12px] text-ink-3">Limits marked NASA come from NASA-STD-3001 Vol. 2 Rev. F (July 2026). The temperature/humidity box and noise in dBA are prototype simplifications.</p>
+      </More>
+    </Pagina>
   );
 }

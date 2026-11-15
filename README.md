@@ -5,6 +5,7 @@
 **Live demo:** https://mendezinxd.github.io/NasaSpaceAppsChallenge2026/
 **Challenge:** NASA Space Apps Challenge 2026, "Create Health Monitoring Software for Astronauts on Space Missions"
 **Team:** Black Belt's Team, Ouro Preto, Brazil
+**Design system:** [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) (colors, type, spacing, pieces, charts, motion, how to extend)
 
 All data in the demo is simulated. Healthnauts supports self-monitoring and crew medical decisions. It does not diagnose any condition.
 
@@ -18,6 +19,7 @@ All data in the demo is simulated. Healthnauts supports self-monitoring and crew
 - [How it works](#how-it-works)
 - [Try the demo](#try-the-demo)
 - [NASA data and scientific basis](#nasa-data-and-scientific-basis)
+- [Design system](#design-system)
 - [Run it locally](#run-it-locally)
 - [Architecture](#architecture)
 - [Limitations and next steps](#limitations-and-next-steps)
@@ -112,6 +114,15 @@ Healthnauts is built on NASA standards and research, not on generic wellness rul
 - **NASA Ames** studies on communication delay for Moon and Mars missions.
 
 Where NASA does not publish a number, the app uses established external references (NEWS2, KSS, Samn-Perelli, PVT-B validation) and labels them. Full list in [References](#references).
+
+## Design system
+
+The visual layer was redesigned as a small, central design system: **change a value in one place and the whole app changes.**
+
+- All colors, alert-level colors and the type scale live in [`src/design/tokens.ts`](src/design/tokens.ts). They become CSS variables at startup, which Tailwind, the global CSS, the charts and the 3D body all read.
+- Every screen is a `<Pagina>` (header + blocks, always 20 px apart) built from the pieces in `src/ui/` (`Painel`, `Numero`, `NumerosGrid`, charts) and `src/components/charts.tsx`.
+- The rules (what each color means, type scale, spacing, motion, what never to do) and recipes (new screen, new color, new chart) are in **[`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)**. Read it before changing anything visual.
+- The science layer (`shared/`: alert levels, limits, calculations) was not touched by the redesign, and the interface never decides a level by itself.
 
 ## Run it locally
 

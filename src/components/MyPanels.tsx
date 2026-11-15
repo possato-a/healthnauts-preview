@@ -3,8 +3,6 @@
 // sem estar no catálogo (ex.: dose de carreira, NEWS2), sem os legados e sem os que repetem outro (COVERED_BY).
 // Valor, unidade e nível vêm da API; seta = compare.ts. A escolha fica na Overview (os cartões de área não repetem valor).
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, ChevronRight, LayoutGrid, SlidersHorizontal } from 'lucide-react';
 import { api, type ApiRecord, type AreaDetail, type Assessment, type DisplayLevel, type Overview } from '../services/api';
 import { AREA, type AreaId } from '../config/api';
 import { useStore } from '../store/useStore';
@@ -13,14 +11,15 @@ import { DAY_MS, deltaText, fmtDuration, fmtHours, startOfToday } from '../lib/f
 import { weekCompare, type WeekCompare } from '../lib/compare';
 import { COVERED_BY, DEFAULT_PANELS, MAX_PANELS, panelId, sortPanels, togglePanel } from '../lib/panels';
 import { indicatorHref } from './scene/sceneMapping';
-import { Modal, StatusPill } from './ui';
+import { Modal } from './ui';
+import { Numero, NumerosGrid, Painel } from '../ui/pecas';
 import { groups } from '../../shared/config/research.js';
 
 const AREAS: AreaId[] = [AREA.isolation, AREA.gravity, AREA.cabin, AREA.radiation, AREA.distance];
 const GROUPS = groups as Record<string, Record<string, string[]>>;
 
 export interface Available { id: string; areaId: AreaId; indicator: string; label: string; unit: string | null; scaleMax?: number; includes: string[] }
-interface Panel extends Available { value: unknown; shown: string | null; level: DisplayLevel | null; week: WeekCompare | null; kind: 'hours' | 'number' }
+interface Panel extends Available { value: unknown; shown: string | null; level: DisplayLevel | null; week: WeekCompare | null; kind: 'hours' | 'number'; trend: number[] }
 
 /** Indicadores disponíveis por área: catálogo (sem os legados) + avaliados fora do catálogo; os repetidos ficam dentro do que os cobre. */
 export function availablePanels(details: Partial<Record<AreaId, AreaDetail>>): Available[] {
@@ -78,12 +77,11 @@ export function useAllAreas() {
   return useStore((s) => s.details);
 }
 
-export function MyPanels({ chosen, onChange }: { chosen: string[]; onChange: (next: string[]) => void }) {
+/** Os números que a pessoa escolheu. O título "Your panels" e o botão Customize ficam na tela (Today), acima, e abrem a janela por `aberto`. */
+export function MyPanels({ chosen, onChange, aberto, onFechar }: { chosen: string[]; onChange: (next: string[]) => void; aberto: boolean; onFechar: () => void }) {
   const details = useAllAreas();
   const overview = useStore((s) => s.overview);
   const version = useStore((s) => s.version);
-  const nav = useNavigate();
-  const [open, setOpen] = useState(false);
   const [week, setWeek] = useState<ApiRecord[]>([]);
 
   useEffect(() => {
@@ -107,59 +105,29 @@ export function MyPanels({ chosen, onChange }: { chosen: string[]; onChange: (ne
       const own = a && a.status !== 'not_applicable' ? a.displayLevel : null;
       const level: DisplayLevel | null = shown === null ? 'unavailable' : own ?? groupLevel(overview, x.areaId, x.indicator);
       const kind = x.unit === 'h' ? 'hours' : 'number';
-      return { ...x, value, shown, level, kind, week: x.scaleMax === 1 && !x.unit ? null : weekCompare(value, week, x.indicator, today0) };
+      // A linhazinha dos últimos 7 dias (só leitura): os registros do indicador, na ordem do tempo.
+      const trend = week.filter((r) => r.indicator === x.indicator).sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt))
+        .map((r) => Number(r.value)).filter(Number.isFinite);
+      return { ...x, value, shown, level, kind, trend, week: x.scaleMax === 1 && !x.unit ? null : weekCompare(value, week, x.indicator, today0) };
     });
     return sortPanels(made, chosen);
   }, [chosen, list, details, week, overview]);
 
   return (
-    <section aria-labelledby="panels-title" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 id="panels-title" className="text-sm font-semibold inline-flex items-center gap-2"><LayoutGrid size={18} className="text-slate-300" aria-hidden="true" />My panels</h2>
-          <p className="text-xs text-slate-300 mt-0.5">Most important first · arrow compares with the last 7 days</p>
-        </div>
-        <button type="button" className="btn-ghost tap" onClick={() => setOpen(true)} aria-haspopup="dialog"><SlidersHorizontal size={16} aria-hidden="true" />Customize</button>
-      </div>
+    <>
       {panels.length === 0 ? (
-        <p className="card !p-5 text-sm text-slate-300">No panels chosen. Use Customize to add up to {MAX_PANELS}.</p>
+        <Painel><p className="text-[13px] text-ink-2">No panels chosen. Use Customize to add up to {MAX_PANELS}.</p></Painel>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {panels.map((p) => <li key={p.id}><PanelCard p={p} onOpen={() => nav(indicatorHref(AREA_PATH[p.areaId], p.indicator))} /></li>)}
-        </ul>
+        <NumerosGrid n={panels.length}>
+          {panels.map((p) => (
+            <Numero key={p.id} nome={p.label} valor={p.shown ?? '–'} serie={p.trend.length > 1 ? p.trend : undefined} nivel={p.level}
+              comparacao={p.shown !== null && p.week ? `${deltaText(p.value as number, p.week.avg, p.kind)} vs 7 days` : undefined}
+              to={indicatorHref(AREA_PATH[p.areaId], p.indicator)} />
+          ))}
+        </NumerosGrid>
       )}
-      <Customize open={open} onClose={() => setOpen(false)} list={list} chosen={chosen} onSave={(next) => { onChange(next); setOpen(false); }} />
-    </section>
-  );
-}
-
-function Arrow({ p }: { p: Panel }) {
-  const w = p.week;
-  if (!w) return <span className="text-xs text-slate-400">No 7-day average yet</span>;
-  const Icon = w.direction === 'up' ? ArrowUpRight : w.direction === 'down' ? ArrowDownRight : ArrowRight;
-  const word = w.direction === 'up' ? 'Higher than' : w.direction === 'down' ? 'Lower than' : 'Same as';
-  const avg = show(w.avg, p.unit, p.scaleMax) ?? '–';
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-slate-300">
-      <Icon size={14} aria-hidden="true" className="text-slate-200" />
-      <span className="sr-only">{word} the 7-day average ({avg}):</span>
-      <span className="font-mono text-slate-200">{deltaText(p.value as number, w.avg, p.kind)}</span>
-      <span aria-hidden="true">vs 7-day avg</span>
-    </span>
-  );
-}
-
-function PanelCard({ p, onOpen }: { p: Panel; onOpen: () => void }) {
-  return (
-    <button type="button" onClick={onOpen} className="card !p-4 w-full h-full text-left flex flex-col gap-2 hover:border-slate-500">
-      <span className="flex items-start justify-between gap-2">
-        <span className="text-sm text-slate-200 leading-snug">{p.label}<span className="sr-only"> · {AREA_LABEL[p.areaId]}</span></span>
-        <ChevronRight size={15} className="text-slate-400 shrink-0 mt-0.5" aria-hidden="true" />
-      </span>
-      <span className="text-2xl font-medium tracking-tight text-slate-50 line-clamp-2 break-words">{p.shown ?? '–'}</span>
-      {p.level && <span className="flex flex-wrap items-center gap-2"><StatusPill level={p.level} small /></span>}
-      {p.shown !== null && <Arrow p={p} />}
-    </button>
+      <Customize open={aberto} onClose={onFechar} list={list} chosen={chosen} onSave={(next) => { onChange(next); onFechar(); }} />
+    </>
   );
 }
 
@@ -171,24 +139,24 @@ function Customize({ open, onClose, list, chosen, onSave }: {
   const full = draft.length >= MAX_PANELS;
   return (
     <Modal open={open} onClose={onClose} title="Customize my panels" sub={`Choose up to ${MAX_PANELS} indicators from the onboard catalog`} wide>
-      <p className="text-sm text-slate-200" aria-live="polite"><span className="font-mono">{draft.length}/{MAX_PANELS}</span> selected{full ? ' · limit reached' : ''}</p>
-      <div className="mt-3 max-h-[55vh] overflow-y-auto pr-1 space-y-4">
+      <p className="text-[12px] text-ink-3" aria-live="polite"><span className="num text-ink">{draft.length}/{MAX_PANELS}</span> selected{full ? ' · limit reached' : ''}</p>
+      <div className="mt-4 grid max-h-[55vh] gap-5 overflow-y-auto pr-1">
         {AREAS.map((areaId, gi) => {
           const items = list.filter((x) => x.areaId === areaId);
           if (!items.length) return null;
           return (
             <fieldset key={areaId}>
-              <legend className="text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">{AREA_LABEL[areaId]}</legend>
-              <div className="grid sm:grid-cols-2 gap-1.5">
+              <legend className="eyebrow mb-2">{AREA_LABEL[areaId]}</legend>
+              <div className="grid gap-1.5 sm:grid-cols-2">
                 {items.map((x, i) => {
                   const on = draft.includes(x.id); const disabled = !on && full;
                   return (
-                    <label key={x.id} className={`tap flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${on ? 'border-brand/60 bg-brand/10 text-slate-50' : 'border-space-line text-slate-200'} ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
-                      <input type="checkbox" className="accent-brand w-4 h-4 shrink-0" checked={on} disabled={disabled} onChange={() => setDraft(togglePanel(draft, x.id))}
+                    <label key={x.id} className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors ${on ? 'bg-green-soft text-ink [box-shadow:inset_0_0_0_1px_rgb(var(--green-line))]' : 'text-ink-2 [box-shadow:inset_0_0_0_1px_rgb(var(--border))] hover:bg-hover'} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                      <input type="checkbox" className="shrink-0" checked={on} disabled={disabled} onChange={() => setDraft(togglePanel(draft, x.id))}
                         {...(gi === 0 && i === 0 ? { 'data-autofocus': true } : {})} />
-                      <span>
-                        {x.label}{x.unit && x.unit !== 'count' ? <span className="text-slate-300"> · {x.unit}</span> : null}
-                        {x.includes.length > 0 && <span className="block text-xs text-slate-300">Includes {x.includes.join(' and ')}</span>}
+                      <span className="min-w-0">
+                        {x.label}{x.unit && x.unit !== 'count' ? <span className="text-ink-3"> · {x.unit}</span> : null}
+                        {x.includes.length > 0 && <span className="block text-[12px] text-ink-3">Includes {x.includes.join(' and ')}</span>}
                       </span>
                     </label>
                   );
@@ -198,11 +166,11 @@ function Customize({ open, onClose, list, chosen, onSave }: {
           );
         })}
       </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-        <button type="button" className="btn-ghost tap" onClick={() => setDraft([...DEFAULT_PANELS])}>Reset to default</button>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+        <button type="button" className="btn-ghost" onClick={() => setDraft([...DEFAULT_PANELS])}>Reset to default</button>
         <span className="flex gap-2">
-          <button type="button" className="btn-ghost tap" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary tap" onClick={() => onSave(draft)}>Save</button>
+          <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-primary" onClick={() => onSave(draft)}>Save</button>
         </span>
       </div>
     </Modal>
